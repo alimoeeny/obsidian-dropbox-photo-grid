@@ -1,0 +1,181 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dropbox File Fetcher</title>
+    <script src="https://unpkg.com/dropbox/dist/Dropbox-sdk.min.js"></script>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        .container {
+            background-color: #f5f5f5;
+            padding: 20px;
+            border-radius: 8px;
+        }
+        .form-group {
+            margin-bottom: 15px;
+        }
+        label {
+            display: block;
+            margin-bottom: 5px;
+        }
+        input {
+            width: 100%;
+            padding: 8px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+        }
+        button {
+            background-color: #0061fe;
+            color: white;
+            padding: 10px 20px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+        button:hover {
+            background-color: #0050d4;
+        }
+        #fileList {
+            margin-top: 20px;
+        }
+        .file-item {
+            background-color: white;
+            padding: 10px;
+            margin-bottom: 10px;
+            border-radius: 4px;
+            border: 1px solid #ddd;
+        }
+        .download-button {
+            background-color: #22c55e;
+            margin-left: 10px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Dropbox File Fetcher</h1>
+        <div class="form-group">
+            <label for="accessToken">Access Token:</label>
+            <input type="password" id="accessToken" placeholder="Enter your Dropbox access token">
+        </div>
+        <div class="form-group">
+            <label for="folderPath">Folder Path:</label>
+            <input type="text" id="folderPath" placeholder="e.g., /Photos">
+        </div>
+        <div class="form-group">
+            <label for="date">Date (YYYY-MM-DD):</label>
+            <input type="date" id="date">
+        </div>
+        <button onclick="fetchFiles()">Fetch Files</button>
+        <div id="fileList"></div>
+    </div>
+
+    <script>
+        async function fetchFiles() {
+            const accessToken = document.getElementById('accessToken').value;
+            const folderPath = document.getElementById('folderPath').value;
+            const date = document.getElementById('date').value;
+
+            if (!accessToken || !folderPath || !date) {
+                alert('Please fill in all fields');
+                return;
+            }
+
+            const dbx = new Dropbox.Dropbox({ accessToken });
+            const targetDate = new Date(date);
+            
+            try {
+                let files = [];
+                let response = await dbx.filesListFolder({path: folderPath});
+                
+                while (true) {
+                    for (const entry of response.result.entries) {
+                        if (entry['.tag'] === 'file') {
+                            const fileDate = new Date(entry.client_modified);
+                            if (isSameDate(fileDate, targetDate)) {
+                                files.push(entry);
+                            }
+                        }
+                    }
+
+                    if (!response.result.has_more) {
+                        break;
+                    }
+
+                    response = await dbx.filesListFolderContinue({
+                        cursor: response.result.cursor
+                    });
+                }
+
+                displayFiles(files, dbx);
+            } catch (error) {
+                console.error('Error:', error);
+                alert('Error fetching files: ' + error.message);
+            }
+        }
+
+        function isSameDate(date1, date2) {
+            return date1.getFullYear() === date2.getFullYear() &&
+                   date1.getMonth() === date2.getMonth() &&
+                   date1.getDate() === date2.getDate();
+        }
+
+        function displayFiles(files, dbx) {
+            const fileList = document.getElementById('fileList');
+            fileList.innerHTML = '';
+
+            if (files.length === 0) {
+                fileList.innerHTML = '<p>No files found for the selected date.</p>';
+                return;
+            }
+
+            files.forEach(file => {
+                const fileDiv = document.createElement('div');
+                fileDiv.className = 'file-item';
+                
+                const fileInfo = document.createElement('span');
+                fileInfo.textContent = `${file.name} (${formatBytes(file.size)})`;
+                
+                const downloadButton = document.createElement('button');
+                downloadButton.textContent = 'Download';
+                downloadButton.className = 'download-button';
+                downloadButton.onclick = () => downloadFile(file, dbx);
+                
+                fileDiv.appendChild(fileInfo);
+                fileDiv.appendChild(downloadButton);
+                fileList.appendChild(fileDiv);
+            });
+        }
+
+        function formatBytes(bytes) {
+            if (bytes === 0) return '0 Bytes';
+            const k = 1024;
+            const sizes = ['Bytes', 'KB', 'MB', 'GB'];
+            const i = Math.floor(Math.log(bytes) / Math.log(k));
+            return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+        }
+
+        async function downloadFile(file, dbx) {
+            try {
+                const response = await dbx.filesDownload({path: file.path_lower});
+                const blob = response.result.fileBlob;
+                
+                const link = document.createElement('a');
+                link.href = window.URL.createObjectURL(blob);
+                link.download = file.name;
+                link.click();
+                window.URL.revokeObjectURL(link.href);
+            } catch (error) {
+                console.error('Error downloading file:', error);
+                alert('Error downloading file: ' + error.message);
+            }
+        }
+    </script>
+</body>
+</html>
