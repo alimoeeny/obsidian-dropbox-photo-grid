@@ -1,0 +1,9 @@
+{
+    "id": "obsidian-dropbox-photo-grid",
+    "name": "Dropbox Photo Grid",
+    "version": "1.0.0",
+    "minAppVersion": "0.15.0",
+    "description": "Embed a grid of photos from Dropbox based on date",
+    "author": "Your Name",
+    "isDesktopOnly": false
+}

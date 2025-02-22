@@ -1,0 +1,29 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dropbox Thumbnails</title>
+    <script src="https://unpkg.com/dropbox/dist/Dropbox-sdk.min.js"></script>
+    <script src="embed.js"></script>
+    <style>
+        body {
+            margin: 0;
+            padding: 20px;
+            background-color: #f7f9fc;
+        }
+        #dropbox-container {
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+    </style>
+</head>
+<body>
+    <div id="dropbox-container"></div>
+    <script>
+        // Initialize the viewer with your Dropbox token and display thumbnails
+        const viewer = new DropboxThumbnailViewer('dropbox-container', 'sl.CBxYYcOqrPhe4gxS7JbZ4U7vcbyy0m5yqEaEnYke_HlKQxIjHgci-UOcUOTL6uXYxXGVwPiC2fH5od1T4ujCPP5TrmjOI2fwxD0MEdTb90b9ct2lFKX2H2OcBM-1uEkRrlOMzPWt0YAg');
+        viewer.displayThumbnails('/Camera Uploads', '2024-11-30');
+    </script>
+</body>
+</html>
