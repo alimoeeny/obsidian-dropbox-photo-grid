@@ -17,7 +17,7 @@ export default class DropboxPhotoGridPlugin extends Plugin {
         if (!this.settings.accessToken) {
             throw new Error('Dropbox access token not set. Please set it in the plugin settings.');
         }
-        return new Dropbox({ 
+        return new Dropbox({
             accessToken: this.settings.accessToken,
             fetch: fetch.bind(window)
         });
@@ -28,26 +28,87 @@ export default class DropboxPhotoGridPlugin extends Plugin {
         return !!path.toLowerCase().match(/\.(jpg|jpeg|png|gif)$/);
     }
 
-    // Pure function to check if dates match
+    // Pure function to parse date string into Date object in local timezone
+    private static parseDate(dateStr: string): Date {
+        // Try parsing custom format first to ensure local timezone
+        const matches = dateStr.match(/^(\d{4})-(\d{2})-(\d{2})/);
+        if (matches) {
+            const [_, year, month, day] = matches;
+            // Create date in local timezone by using Date.UTC and adjusting for local offset
+            const utcDate = Date.UTC(parseInt(year), parseInt(month) - 1, parseInt(day));
+            const localDate = new Date(utcDate);
+            const offset = localDate.getTimezoneOffset() * 60000; // convert minutes to milliseconds
+            return new Date(utcDate + offset);
+        }
+        
+        // Fallback to standard parsing
+        const date = new Date(dateStr);
+        if (!isNaN(date.getTime())) {
+            // Ensure we're using local midnight
+            return new Date(date.getFullYear(), date.getMonth(), date.getDate());
+        }
+        
+        throw new Error(`Invalid date format: ${dateStr}. Please use YYYY-MM-DD format.`);
+    }
+
+    // Pure function to check if dates match (comparing only year, month, and day)
     private static datesMatch(fileDate: Date, targetDate: Date): boolean {
-        return fileDate.toDateString() === targetDate.toDateString();
+        const fileYear = fileDate.getFullYear();
+        const fileMonth = fileDate.getMonth();
+        const fileDay = fileDate.getDate();
+        
+        const targetYear = targetDate.getFullYear();
+        const targetMonth = targetDate.getMonth();
+        const targetDay = targetDate.getDate();
+
+        const matches = fileYear === targetYear && 
+                       fileMonth === targetMonth && 
+                       fileDay === targetDay;
+
+        console.log('Date comparison:', {
+            file: {
+                original: fileDate.toISOString(),
+                year: fileYear,
+                month: fileMonth + 1, // +1 for human-readable month
+                day: fileDay
+            },
+            target: {
+                original: targetDate.toISOString(),
+                year: targetYear,
+                month: targetMonth + 1, // +1 for human-readable month
+                day: targetDay
+            },
+            matches
+        });
+
+        return matches;
     }
 
     // Pure function to filter files by date and type
     private static filterFiles(files: files.FileMetadata[], targetDate: Date): files.FileMetadata[] {
-        return files.filter(file => {
-            // Check if it's a file (not a folder)
+        console.log(`Filtering ${files.length} files for date: ${targetDate.toISOString()}`);
+        
+        const matchingFiles = files.filter(file => {
             if (!('path_lower' in file) || !file.path_lower) {
+                console.log('Skipping file without path:', file);
                 return false;
             }
             if (!DropboxPhotoGridPlugin.isImageFile(file.path_lower)) {
+                console.log('Skipping non-image:', file.path_lower);
                 return false;
             }
-            return DropboxPhotoGridPlugin.datesMatch(
-                new Date(file.client_modified),
-                targetDate
-            );
+            
+            const fileDate = new Date(file.client_modified);
+            return DropboxPhotoGridPlugin.datesMatch(fileDate, targetDate);
         });
+
+        console.log(`Found ${matchingFiles.length} matching files`);
+        return matchingFiles;
+    }
+
+    // Pure function to check if path is a direct file path
+    private static isDirectFilePath(path: string): boolean {
+        return path.toLowerCase().match(/\.(jpg|jpeg|png|gif)$/) !== null;
     }
 
     // Pure function to create grid styles
@@ -87,12 +148,12 @@ export default class DropboxPhotoGridPlugin extends Plugin {
         let cursor: string | undefined;
 
         while (hasMore) {
-            const response = cursor 
+            const response = cursor
                 ? await dbx.filesListFolderContinue({ cursor })
                 : await dbx.filesListFolder({
                     path: folderPath,
                     include_media_info: true,
-                    limit: 100
+                    limit: 1000
                 });
 
             allFiles = allFiles.concat(response.result.entries as files.FileMetadata[]);
@@ -101,6 +162,29 @@ export default class DropboxPhotoGridPlugin extends Plugin {
         }
 
         return allFiles;
+    }
+
+    // Async function to get a single file metadata
+    private async getFileMetadata(dbx: Dropbox, path: string): Promise<files.FileMetadata | null> {
+        try {
+            const response = await dbx.filesGetMetadata({
+                path: path
+            });
+            return response.result as files.FileMetadata;
+        } catch (error) {
+            console.error('Error getting file metadata:', error);
+            return null;
+        }
+    }
+
+    // Async function to fetch files based on path type
+    private async getFiles(dbx: Dropbox, path: string): Promise<files.FileMetadata[]> {
+        if (DropboxPhotoGridPlugin.isDirectFilePath(path)) {
+            const file = await this.getFileMetadata(dbx, path);
+            return file ? [file] : [];
+        } else {
+            return this.getAllFiles(dbx, path);
+        }
     }
 
     async onload() {
@@ -119,25 +203,35 @@ export default class DropboxPhotoGridPlugin extends Plugin {
                     return;
                 }
 
-                const container = el.createEl('div', { 
-                    attr: { class: 'dropbox-photo-grid' } 
+                const container = el.createEl('div', {
+                    attr: { class: 'dropbox-photo-grid' }
                 });
 
                 try {
                     const dbx = this.getDropboxClient();
-                    const allFiles = await this.getAllFiles(dbx, folderPath);
-                    const targetDate = new Date(date);
+                    const allFiles = await this.getFiles(dbx, folderPath);
+                    console.log(`Processing ${allFiles.length} files from path: ${folderPath}`);
+                    
+                    const targetDate = DropboxPhotoGridPlugin.parseDate(date);
+                    console.log('Target date:', {
+                        original: date,
+                        parsed: targetDate.toISOString(),
+                        year: targetDate.getFullYear(),
+                        month: targetDate.getMonth() + 1,
+                        day: targetDate.getDate()
+                    });
+                    
                     const matchingFiles = DropboxPhotoGridPlugin.filterFiles(allFiles, targetDate);
 
                     if (matchingFiles.length === 0) {
-                        container.createEl('div', { 
+                        container.createEl('div', {
                             text: `No photos found for date: ${date}`,
                             attr: { style: 'text-align: center; padding: 20px;' }
                         });
                         return;
                     }
 
-                    const grid = container.createEl('div', { 
+                    const grid = container.createEl('div', {
                         cls: 'photo-grid',
                         attr: { style: DropboxPhotoGridPlugin.getGridStyles() }
                     });
@@ -154,7 +248,7 @@ export default class DropboxPhotoGridPlugin extends Plugin {
                     // Then fetch and set all images
                     await Promise.all(photoContainers.map(async ({ container, file }) => {
                         if (!file.path_lower) return;
-                        
+
                         const response = await dbx.filesGetTemporaryLink({
                             path: file.path_lower
                         });
@@ -169,7 +263,7 @@ export default class DropboxPhotoGridPlugin extends Plugin {
 
                 } catch (error) {
                     console.error('Dropbox API error:', error);
-                    container.createEl('div', { 
+                    container.createEl('div', {
                         text: `Error loading photos: ${error.message}`,
                         attr: { style: 'color: red; text-align: center; padding: 20px;' }
                     });
