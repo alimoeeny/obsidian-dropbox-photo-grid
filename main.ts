@@ -141,6 +141,40 @@ export default class DropboxPhotoGridPlugin extends Plugin {
         `;
     }
 
+    // Pure function to get loading indicator styles
+    private static getLoadingStyles(): string {
+        return `
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+            gap: 10px;
+        `;
+    }
+
+    // Pure function to get spinner styles
+    private static getSpinnerStyles(): string {
+        return `
+            border: 3px solid var(--background-modifier-border);
+            border-top: 3px solid var(--text-accent);
+            border-radius: 50%;
+            width: 24px;
+            height: 24px;
+            animation: spin 1s linear infinite;
+        `;
+    }
+
+    // Pure function to get keyframes for spinner
+    private static getSpinnerKeyframes(): string {
+        return `
+            @keyframes spin {
+                0% { transform: rotate(0deg); }
+                100% { transform: rotate(360deg); }
+            }
+        `;
+    }
+
     // Async function to fetch all files from Dropbox with pagination
     private async getAllFiles(dbx: Dropbox, folderPath: string): Promise<files.FileMetadata[]> {
         let allFiles: files.FileMetadata[] = [];
@@ -191,6 +225,11 @@ export default class DropboxPhotoGridPlugin extends Plugin {
         await this.loadSettings();
         this.addSettingTab(new DropboxPhotoGridSettingTab(this.app, this));
 
+        // Add spinner keyframes to document
+        const style = document.createElement('style');
+        style.innerHTML = DropboxPhotoGridPlugin.getSpinnerKeyframes();
+        document.head.appendChild(style);
+
         this.registerMarkdownCodeBlockProcessor('dropbox-photos', async (source, el) => {
             try {
                 const [folderPath, date] = source.trim().split('\n');
@@ -205,6 +244,19 @@ export default class DropboxPhotoGridPlugin extends Plugin {
 
                 const container = el.createEl('div', {
                     attr: { class: 'dropbox-photo-grid' }
+                });
+
+                // Show loading indicator
+                const loadingContainer = container.createEl('div', {
+                    attr: { style: DropboxPhotoGridPlugin.getLoadingStyles() }
+                });
+                
+                const spinner = loadingContainer.createEl('div', {
+                    attr: { style: DropboxPhotoGridPlugin.getSpinnerStyles() }
+                });
+                
+                loadingContainer.createEl('div', {
+                    text: 'Loading photos from Dropbox...'
                 });
 
                 try {
@@ -222,6 +274,9 @@ export default class DropboxPhotoGridPlugin extends Plugin {
                     });
                     
                     const matchingFiles = DropboxPhotoGridPlugin.filterFiles(allFiles, targetDate);
+
+                    // Remove loading indicator
+                    loadingContainer.remove();
 
                     if (matchingFiles.length === 0) {
                         container.createEl('div', {
@@ -262,6 +317,8 @@ export default class DropboxPhotoGridPlugin extends Plugin {
                     }));
 
                 } catch (error) {
+                    // Remove loading indicator and show error
+                    loadingContainer.remove();
                     console.error('Dropbox API error:', error);
                     container.createEl('div', {
                         text: `Error loading photos: ${error.message}`,
