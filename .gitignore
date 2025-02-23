@@ -1,1 +1,21 @@
 /node_modules
+
+# Node.js dependencies
+node_modules/
+
+# Build output
+main.js
+*.js.map
+
+# IDE and editor files
+.idea/
+.vscode/
+*.swp
+*~
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# npm debug logs
+npm-debug.log*

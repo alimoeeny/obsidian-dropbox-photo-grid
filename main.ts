@@ -1,6 +1,5 @@
 import { App, Plugin, PluginSettingTab, Setting } from 'obsidian';
 import { Dropbox } from 'dropbox';
-import { MarkdownPostProcessorContext } from 'obsidian';
 
 interface DropboxPhotoGridSettings {
     accessToken: string;
@@ -12,19 +11,27 @@ const DEFAULT_SETTINGS: DropboxPhotoGridSettings = {
 
 export default class DropboxPhotoGridPlugin extends Plugin {
     settings: DropboxPhotoGridSettings;
-    dbx: Dropbox;
+    dbx: Dropbox | null = null;
+
+    private getDropboxClient(): Dropbox {
+        if (!this.settings.accessToken) {
+            throw new Error('Dropbox access token not set. Please set it in the plugin settings.');
+        }
+        // Create a new client each time to ensure we're using the current token
+        return new Dropbox({ 
+            accessToken: this.settings.accessToken,
+            fetch: fetch.bind(window) // Ensure we're using the browser's fetch
+        });
+    }
 
     async onload() {
         await this.loadSettings();
-        
-        // Initialize Dropbox client
-        this.dbx = new Dropbox({ accessToken: this.settings.accessToken });
 
         // Add a settings tab
         this.addSettingTab(new DropboxPhotoGridSettingTab(this.app, this));
 
         // Register the markdown code block processor
-        this.registerMarkdownCodeBlockProcessor('dropbox-photos', async (source, el, ctx: MarkdownPostProcessorContext) => {
+        this.registerMarkdownCodeBlockProcessor('dropbox-photos', async (source, el, ctx) => {
             try {
                 const [folderPath, date] = source.trim().split('\n');
                 if (!folderPath || !date) {
@@ -45,8 +52,10 @@ export default class DropboxPhotoGridPlugin extends Plugin {
                 });
 
                 try {
+                    const dbx = this.getDropboxClient();
+                    
                     // List files in the folder
-                    const response = await this.dbx.filesListFolder({
+                    const response = await dbx.filesListFolder({
                         path: folderPath,
                         include_media_info: true
                     });
@@ -76,10 +85,10 @@ export default class DropboxPhotoGridPlugin extends Plugin {
 
                     // Add photos to grid
                     for (const file of files) {
-                        if (!file.path_lower) continue; // Skip if path is undefined
+                        if (!file.path_lower) continue;
                         
-                        const response = await this.dbx.filesGetTemporaryLink({
-                            path: file.path_lower // TypeScript now knows this is not undefined
+                        const response = await dbx.filesGetTemporaryLink({
+                            path: file.path_lower
                         });
 
                         const photoContainer = grid.createEl('div', {
@@ -116,6 +125,7 @@ export default class DropboxPhotoGridPlugin extends Plugin {
                         });
                     }
                 } catch (error) {
+                    console.error('Dropbox API error:', error);
                     container.createEl('div', { 
                         text: `Error loading photos: ${error.message}`,
                         attr: {
@@ -124,6 +134,7 @@ export default class DropboxPhotoGridPlugin extends Plugin {
                     });
                 }
             } catch (error) {
+                console.error('Plugin error:', error);
                 el.createEl('div', { text: `Error: ${error.message}` });
             }
         });
