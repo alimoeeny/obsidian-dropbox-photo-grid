@@ -1,5 +1,5 @@
 import { App, Plugin, PluginSettingTab, Setting } from 'obsidian';
-import { Dropbox } from 'dropbox';
+import { Dropbox, files } from 'dropbox';
 
 interface DropboxPhotoGridSettings {
     accessToken: string;
@@ -17,21 +17,97 @@ export default class DropboxPhotoGridPlugin extends Plugin {
         if (!this.settings.accessToken) {
             throw new Error('Dropbox access token not set. Please set it in the plugin settings.');
         }
-        // Create a new client each time to ensure we're using the current token
         return new Dropbox({ 
             accessToken: this.settings.accessToken,
-            fetch: fetch.bind(window) // Ensure we're using the browser's fetch
+            fetch: fetch.bind(window)
         });
+    }
+
+    // Pure function to check if a file is an image
+    private static isImageFile(path: string): boolean {
+        return !!path.toLowerCase().match(/\.(jpg|jpeg|png|gif)$/);
+    }
+
+    // Pure function to check if dates match
+    private static datesMatch(fileDate: Date, targetDate: Date): boolean {
+        return fileDate.toDateString() === targetDate.toDateString();
+    }
+
+    // Pure function to filter files by date and type
+    private static filterFiles(files: files.FileMetadata[], targetDate: Date): files.FileMetadata[] {
+        return files.filter(file => {
+            // Check if it's a file (not a folder)
+            if (!('path_lower' in file) || !file.path_lower) {
+                return false;
+            }
+            if (!DropboxPhotoGridPlugin.isImageFile(file.path_lower)) {
+                return false;
+            }
+            return DropboxPhotoGridPlugin.datesMatch(
+                new Date(file.client_modified),
+                targetDate
+            );
+        });
+    }
+
+    // Pure function to create grid styles
+    private static getGridStyles(): string {
+        return `
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+            gap: 20px;
+            padding: 20px 0;
+        `;
+    }
+
+    // Pure function to create photo container styles
+    private static getPhotoContainerStyles(): string {
+        return `
+            aspect-ratio: 1;
+            overflow: hidden;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            transition: transform 0.2s;
+        `;
+    }
+
+    // Pure function to create photo styles
+    private static getPhotoStyles(): string {
+        return `
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+        `;
+    }
+
+    // Async function to fetch all files from Dropbox with pagination
+    private async getAllFiles(dbx: Dropbox, folderPath: string): Promise<files.FileMetadata[]> {
+        let allFiles: files.FileMetadata[] = [];
+        let hasMore = true;
+        let cursor: string | undefined;
+
+        while (hasMore) {
+            const response = cursor 
+                ? await dbx.filesListFolderContinue({ cursor })
+                : await dbx.filesListFolder({
+                    path: folderPath,
+                    include_media_info: true,
+                    limit: 100
+                });
+
+            allFiles = allFiles.concat(response.result.entries as files.FileMetadata[]);
+            hasMore = response.result.has_more;
+            cursor = response.result.cursor;
+        }
+
+        return allFiles;
     }
 
     async onload() {
         await this.loadSettings();
-
-        // Add a settings tab
         this.addSettingTab(new DropboxPhotoGridSettingTab(this.app, this));
 
-        // Register the markdown code block processor
-        this.registerMarkdownCodeBlockProcessor('dropbox-photos', async (source, el, ctx) => {
+        this.registerMarkdownCodeBlockProcessor('dropbox-photos', async (source, el) => {
             try {
                 const [folderPath, date] = source.trim().split('\n');
                 if (!folderPath || !date) {
@@ -43,94 +119,59 @@ export default class DropboxPhotoGridPlugin extends Plugin {
                     return;
                 }
 
-                const containerId = `dropbox-grid-${Date.now()}`;
                 const container = el.createEl('div', { 
-                    attr: { 
-                        id: containerId,
-                        class: 'dropbox-photo-grid'
-                    } 
+                    attr: { class: 'dropbox-photo-grid' } 
                 });
 
                 try {
                     const dbx = this.getDropboxClient();
-                    
-                    // List files in the folder
-                    const response = await dbx.filesListFolder({
-                        path: folderPath,
-                        include_media_info: true
-                    });
+                    const allFiles = await this.getAllFiles(dbx, folderPath);
+                    const targetDate = new Date(date);
+                    const matchingFiles = DropboxPhotoGridPlugin.filterFiles(allFiles, targetDate);
 
-                    // Filter files by date and only include images
-                    const files = response.result.entries.filter(file => {
-                        if (file['.tag'] !== 'file') return false;
-                        if (!file.path_lower?.toLowerCase().match(/\.(jpg|jpeg|png|gif)$/)) return false;
-                        
-                        const fileDate = new Date(file.client_modified);
-                        const targetDate = new Date(date);
-                        return fileDate.toDateString() === targetDate.toDateString();
-                    });
+                    if (matchingFiles.length === 0) {
+                        container.createEl('div', { 
+                            text: `No photos found for date: ${date}`,
+                            attr: { style: 'text-align: center; padding: 20px;' }
+                        });
+                        return;
+                    }
 
-                    // Create grid layout
                     const grid = container.createEl('div', { 
                         cls: 'photo-grid',
-                        attr: {
-                            style: `
-                                display: grid;
-                                grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
-                                gap: 20px;
-                                padding: 20px 0;
-                            `
-                        }
+                        attr: { style: DropboxPhotoGridPlugin.getGridStyles() }
                     });
 
-                    // Add photos to grid
-                    for (const file of files) {
-                        if (!file.path_lower) continue;
+                    // Create all photo containers first
+                    const photoContainers = matchingFiles.map(file => {
+                        const container = grid.createEl('div', {
+                            cls: 'photo-container',
+                            attr: { style: DropboxPhotoGridPlugin.getPhotoContainerStyles() }
+                        });
+                        return { container, file };
+                    });
+
+                    // Then fetch and set all images
+                    await Promise.all(photoContainers.map(async ({ container, file }) => {
+                        if (!file.path_lower) return;
                         
                         const response = await dbx.filesGetTemporaryLink({
                             path: file.path_lower
                         });
 
-                        const photoContainer = grid.createEl('div', {
-                            cls: 'photo-container',
-                            attr: {
-                                style: `
-                                    aspect-ratio: 1;
-                                    overflow: hidden;
-                                    border-radius: 8px;
-                                    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-                                    transition: transform 0.2s;
-                                `
-                            }
-                        });
-
-                        photoContainer.createEl('img', {
+                        container.createEl('img', {
                             attr: {
                                 src: response.result.link,
-                                style: `
-                                    width: 100%;
-                                    height: 100%;
-                                    object-fit: cover;
-                                `
+                                style: DropboxPhotoGridPlugin.getPhotoStyles()
                             }
                         });
-                    }
+                    }));
 
-                    if (files.length === 0) {
-                        container.createEl('div', { 
-                            text: `No photos found for date: ${date}`,
-                            attr: {
-                                style: 'text-align: center; padding: 20px;'
-                            }
-                        });
-                    }
                 } catch (error) {
                     console.error('Dropbox API error:', error);
                     container.createEl('div', { 
                         text: `Error loading photos: ${error.message}`,
-                        attr: {
-                            style: 'color: red; text-align: center; padding: 20px;'
-                        }
+                        attr: { style: 'color: red; text-align: center; padding: 20px;' }
                     });
                 }
             } catch (error) {
