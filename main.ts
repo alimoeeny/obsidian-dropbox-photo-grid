@@ -1,22 +1,63 @@
-import { App, Plugin, PluginSettingTab, Setting } from 'obsidian';
+import { App, Plugin, PluginSettingTab, Setting, Notice } from 'obsidian';
 import { Dropbox, files } from 'dropbox';
+import * as http from 'http';
+
+// Get electron modules
+const electron = require('electron');
+const { remote } = electron;
 
 interface DropboxPhotoGridSettings {
     accessToken: string;
+    refreshToken: string;
+    clientId: string;
+    codeVerifier: string;
 }
 
 const DEFAULT_SETTINGS: DropboxPhotoGridSettings = {
-    accessToken: ''
+    accessToken: '',
+    refreshToken: '',
+    clientId: '',
+    codeVerifier: ''
 };
 
 export default class DropboxPhotoGridPlugin extends Plugin {
     settings: DropboxPhotoGridSettings;
     dbx: Dropbox | null = null;
 
-    private getDropboxClient(): Dropbox {
-        if (!this.settings.accessToken) {
-            throw new Error('Dropbox access token not set. Please set it in the plugin settings.');
+    private async getDropboxClient(): Promise<Dropbox> {
+        if (!this.settings.clientId) {
+            throw new Error('Dropbox client ID not set. Please set it in the plugin settings.');
         }
+
+        // If we have a refresh token, use it to get a new access token
+        if (this.settings.refreshToken) {
+            try {
+                const response = await fetch('https://api.dropbox.com/oauth2/token', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/x-www-form-urlencoded',
+                    },
+                    body: new URLSearchParams({
+                        grant_type: 'refresh_token',
+                        refresh_token: this.settings.refreshToken,
+                        client_id: this.settings.clientId,
+                    }),
+                });
+
+                if (response.ok) {
+                    const data = await response.json();
+                    this.settings.accessToken = data.access_token;
+                    await this.saveSettings();
+                }
+            } catch (error) {
+                console.error('Error refreshing access token:', error);
+            }
+        }
+
+        if (!this.settings.accessToken) {
+            throw new Error('No valid Dropbox access token available. Please authenticate through the plugin settings.');
+        }
+
         return new Dropbox({
             accessToken: this.settings.accessToken,
             fetch: fetch.bind(window)
@@ -237,8 +278,8 @@ export default class DropboxPhotoGridPlugin extends Plugin {
                     throw new Error('Both folder path and date are required');
                 }
 
-                if (!this.settings.accessToken) {
-                    el.createEl('div', { text: 'Please set your Dropbox access token in the settings' });
+                if (!this.settings.clientId) {
+                    el.createEl('div', { text: 'Please set your Dropbox client ID in the settings' });
                     return;
                 }
 
@@ -260,7 +301,7 @@ export default class DropboxPhotoGridPlugin extends Plugin {
                 });
 
                 try {
-                    const dbx = this.getDropboxClient();
+                    const dbx = await this.getDropboxClient();
                     const allFiles = await this.getFiles(dbx, folderPath);
                     console.log(`Processing ${allFiles.length} files from path: ${folderPath}`);
                     
@@ -354,14 +395,158 @@ class DropboxPhotoGridSettingTab extends PluginSettingTab {
         containerEl.empty();
 
         new Setting(containerEl)
-            .setName('Dropbox Access Token')
-            .setDesc('Enter your Dropbox access token')
+            .setName('Dropbox Client ID')
+            .setDesc('Enter your Dropbox app client ID')
             .addText(text => text
-                .setPlaceholder('Enter your token')
-                .setValue(this.plugin.settings.accessToken)
+                .setPlaceholder('Enter your client ID')
+                .setValue(this.plugin.settings.clientId)
                 .onChange(async (value) => {
-                    this.plugin.settings.accessToken = value;
+                    this.plugin.settings.clientId = value;
                     await this.plugin.saveSettings();
                 }));
+
+        new Setting(containerEl)
+            .setName('Authenticate with Dropbox')
+            .setDesc('Click to start OAuth flow')
+            .addButton(button => button
+                .setButtonText('Authenticate')
+                .onClick(async () => {
+                    if (!this.plugin.settings.clientId) {
+                        new Notice('Please set your Client ID first');
+                        return;
+                    }
+
+                    // Generate PKCE code verifier and challenge
+                    const codeVerifier = this.generateCodeVerifier();
+                    const codeChallenge = await this.generateCodeChallenge(codeVerifier);
+
+                    // Store code verifier temporarily
+                    this.plugin.settings.codeVerifier = codeVerifier;
+                    await this.plugin.saveSettings();
+
+                    // Construct OAuth URL
+                    const authUrl = new URL('https://www.dropbox.com/oauth2/authorize');
+                    authUrl.searchParams.append('client_id', this.plugin.settings.clientId);
+                    authUrl.searchParams.append('response_type', 'code');
+                    authUrl.searchParams.append('code_challenge', codeChallenge);
+                    authUrl.searchParams.append('code_challenge_method', 'S256');
+                    authUrl.searchParams.append('token_access_type', 'offline');
+                    authUrl.searchParams.append('redirect_uri', 'http://localhost:53134/callback');
+
+                    // Open OAuth window
+                    window.open(authUrl.toString());
+
+                    // Start local server to handle callback
+                    this.startOAuthServer();
+                }));
+
+        if (this.plugin.settings.refreshToken) {
+            new Setting(containerEl)
+                .setName('Authentication Status')
+                .setDesc('You are authenticated with Dropbox')
+                .addButton(button => button
+                    .setButtonText('Clear Authentication')
+                    .onClick(async () => {
+                        this.plugin.settings.accessToken = '';
+                        this.plugin.settings.refreshToken = '';
+                        await this.plugin.saveSettings();
+                        this.display();
+                    }));
+        }
+    }
+
+    private generateCodeVerifier(): string {
+        const array = new Uint8Array(32);
+        crypto.getRandomValues(array);
+        return Array.from(array, byte => byte.toString(16).padStart(2, '0')).join('');
+    }
+
+    private async generateCodeChallenge(verifier: string): Promise<string> {
+        const encoder = new TextEncoder();
+        const data = encoder.encode(verifier);
+        const hash = await crypto.subtle.digest('SHA-256', data);
+        return btoa(String.fromCharCode(...new Uint8Array(hash)))
+            .replace(/\+/g, '-')
+            .replace(/\//g, '_')
+            .replace(/=+$/, '');
+    }
+
+    private async startOAuthServer() {
+        const server = http.createServer(async (req, res) => {
+            if (req.url?.startsWith('/callback')) {
+                const url = new URL(req.url, 'http://localhost:53134');
+                const code = url.searchParams.get('code');
+
+                if (code) {
+                    try {
+                        // Exchange the code for tokens
+                        const response = await fetch('https://api.dropboxapi.com/oauth2/token', {
+                            method: 'POST',
+                            headers: {
+                                'Content-Type': 'application/x-www-form-urlencoded',
+                            },
+                            body: new URLSearchParams({
+                                code,
+                                grant_type: 'authorization_code',
+                                client_id: this.plugin.settings.clientId,
+                                code_verifier: this.plugin.settings.codeVerifier,
+                                redirect_uri: 'http://localhost:53134/callback',
+                            }),
+                        });
+
+                        if (response.ok) {
+                            const data = await response.json();
+                            
+                            // Store the tokens
+                            this.plugin.settings.accessToken = data.access_token;
+                            this.plugin.settings.refreshToken = data.refresh_token;
+                            await this.plugin.saveSettings();
+
+                            // Show success message
+                            new Notice('Successfully authenticated with Dropbox!');
+                            
+                            // Update the settings UI
+                            this.display();
+                        } else {
+                            new Notice('Failed to authenticate with Dropbox');
+                            console.error('Token exchange failed:', await response.text());
+                        }
+                    } catch (error) {
+                        new Notice('Error during authentication');
+                        console.error('Authentication error:', error);
+                    }
+
+                    // Send response to browser
+                    res.writeHead(200, { 'Content-Type': 'text/html' });
+                    res.end(`
+                        <html>
+                            <body>
+                                <h1>Authentication Complete</h1>
+                                <p>You can close this window and return to Obsidian.</p>
+                                <script>window.close()</script>
+                            </body>
+                        </html>
+                    `);
+
+                    // Close the server
+                    server.close();
+                }
+            }
+        });
+
+        // Start listening on the port
+        server.listen(53134, 'localhost', () => {
+            console.log('OAuth callback server listening on port 53134');
+        });
+
+        // Handle server errors
+        server.on('error', (error: NodeJS.ErrnoException) => {
+            if (error.code === 'EADDRINUSE') {
+                new Notice('Port 53134 is already in use. Please try again in a few moments.');
+            } else {
+                new Notice('Error starting OAuth server');
+                console.error('Server error:', error);
+            }
+        });
     }
 }
