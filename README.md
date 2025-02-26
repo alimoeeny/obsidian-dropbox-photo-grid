@@ -11,12 +11,18 @@ This plugin allows you to embed a grid of photos from your Dropbox account based
 - Respects Obsidian's theme colors
 - Handles pagination for large photo collections
 
+## Installation
+
+1. Open Obsidian Settings
+2. Go to Community Plugins and disable Safe Mode
+3. Click Browse and search for "Dropbox Photo Grid"
+4. Install the plugin and enable it
+
 ## Setup
 
-1. Install the plugin in Obsidian
-2. Install the Templater plugin (required for date templates)
-3. Go to Settings > Dropbox Photo Grid
-4. Enter your Dropbox access token
+1. Go to Settings > Dropbox Photo Grid
+2. Click "Connect to Dropbox" to authorize the plugin
+3. The plugin will automatically handle authentication
 
 ## Usage
 
@@ -123,21 +129,26 @@ For example, if you want to create a daily note template that shows photos from 
    ```
    ```
 
-## Requirements
+## Security and Privacy
 
-- Obsidian v0.15.0 or higher
-- Templater plugin installed and enabled
-- Dropbox account with API access
-- Valid Dropbox access token
-
-## Troubleshooting
-
-- Make sure your Dropbox access token is correctly set in the plugin settings
-- Check that the folder path exists in your Dropbox account
-- Ensure the date format is YYYY-MM-DD
-- Make sure the Templater plugin is installed and enabled
-- If photos aren't showing up, check the developer console (Cmd+Option+I) for any error messages
+- This plugin requires Dropbox authentication to access your photos
+- Your Dropbox credentials are stored securely in Obsidian's local storage
+- The plugin only requests access to files and folders you specify
+- No data is sent to third-party servers
 
 ## Support
 
-If you encounter any issues or have suggestions, please open an issue on the GitHub repository.
+If you encounter any issues or have feature requests:
+
+1. Check the [GitHub Issues](https://github.com/yourgithubusername/obsidian-dropbox-photo-grid/issues) page
+2. Create a new issue if your problem hasn't been reported
+3. Include your Obsidian version and operating system details
+
+## License
+
+This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+
+## Acknowledgments
+
+- Thanks to the Obsidian team for their excellent plugin API
+- Thanks to Dropbox for their SDK
