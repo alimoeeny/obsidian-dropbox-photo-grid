@@ -6,5 +6,8 @@
     "description": "Display and embed photos from your Dropbox account in a customizable grid layout",
     "author": "Ali Moeeny",
     "authorUrl": "https://github.com/alimoeeny",
-    "isDesktopOnly": false
+    "isDesktopOnly": false,
+    "fundingUrl": {
+        "Ko-fi": "https://ko-fi.com/alimoeeny"
+    }
 }

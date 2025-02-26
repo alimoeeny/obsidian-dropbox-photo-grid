@@ -1,6 +1,6 @@
-# Dropbox Photo Grid Plugin for Obsidian
+# Dropbox Photo Grid for Obsidian
 
-This plugin allows you to embed a grid of photos from your Dropbox account based on a specific date. It's perfect for displaying daily photos, memories, or any date-based photo collections.
+This plugin allows you to embed a grid of photos from your Dropbox account based on a specific date. It's perfect for displaying daily photos, memories, or any date-based photo collections within your Obsidian vault.
 
 ## Features
 
@@ -10,13 +10,22 @@ This plugin allows you to embed a grid of photos from your Dropbox account based
 - Loading indicator while fetching photos
 - Respects Obsidian's theme colors
 - Handles pagination for large photo collections
+- Show memories from "On This Day" in previous years
+
 
 ## Installation
 
+### Community Plugins
 1. Open Obsidian Settings
 2. Go to Community Plugins and disable Safe Mode
 3. Click Browse and search for "Dropbox Photo Grid"
 4. Install the plugin and enable it
+
+### Manual Installation
+1. Download the latest release from the [releases page](https://github.com/alimoeeny/obsidian-dropbox-photo-grid/releases)
+2. Extract the files to your vault's `.obsidian/plugins/obsidian-dropbox-photo-grid/` directory
+3. Reload Obsidian
+4. Enable the plugin in the Community Plugins settings
 
 ## Setup
 
@@ -140,9 +149,26 @@ For example, if you want to create a daily note template that shows photos from 
 
 If you encounter any issues or have feature requests:
 
-1. Check the [GitHub Issues](https://github.com/yourgithubusername/obsidian-dropbox-photo-grid/issues) page
+1. Check the [GitHub Issues](https://github.com/alimoeeny/obsidian-dropbox-photo-grid/issues) page
 2. Create a new issue if your problem hasn't been reported
 3. Include your Obsidian version and operating system details
+
+## Changelog
+
+### 1.0.0
+- Initial release
+- Basic Dropbox integration
+- Photo grid display with date filtering
+
+## Development
+
+This plugin is developed using TypeScript and the Obsidian API. Contributions are welcome!
+
+To build the plugin from source:
+1. Clone the repository
+2. Run `npm install`
+3. Run `npm run dev` to start compilation in watch mode
+4. Copy the `main.js`, `manifest.json`, and `styles.css` files to your vault's plugins directory
 
 ## License
 

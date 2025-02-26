@@ -1,16 +1,28 @@
 {
     "name": "obsidian-dropbox-photo-grid",
     "version": "1.0.0",
-    "description": "Display photos from Dropbox in a grid layout",
+    "description": "Display photos from Dropbox in a grid layout for Obsidian",
     "main": "main.js",
     "scripts": {
         "dev": "node esbuild.config.mjs",
         "build": "tsc -noEmit -skipLibCheck && node esbuild.config.mjs production",
-        "version": "node version-bump.mjs && git add manifest.json versions.json"
+        "version": "node version-bump.mjs && git add manifest.json versions.json",
+        "lint": "eslint . --ext .ts"
     },
-    "keywords": [],
-    "author": "",
+    "keywords": [
+        "obsidian",
+        "obsidian-plugin",
+        "dropbox",
+        "photos",
+        "gallery",
+        "grid"
+    ],
+    "author": "Ali Moeeny",
     "license": "MIT",
+    "repository": {
+        "type": "git",
+        "url": "https://github.com/alimoeeny/obsidian-dropbox-photo-grid"
+    },
     "devDependencies": {
         "@types/node": "^16.11.6",
         "@typescript-eslint/eslint-plugin": "5.29.0",
@@ -19,7 +31,8 @@
         "esbuild": "0.17.3",
         "obsidian": "latest",
         "tslib": "2.4.0",
-        "typescript": "4.7.4"
+        "typescript": "4.7.4",
+        "eslint": "^8.32.0"
     },
     "dependencies": {
         "dropbox": "^10.34.0"
