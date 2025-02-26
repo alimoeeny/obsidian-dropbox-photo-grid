@@ -155,6 +155,10 @@ If you encounter any issues or have feature requests:
 
 ## Changelog
 
+### 1.0.1
+- Preparation for submission to Obsidian Community Plugins
+
+
 ### 1.0.0
 - Initial release
 - Basic Dropbox integration
