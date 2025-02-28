@@ -395,6 +395,24 @@ class DropboxPhotoGridSettingTab extends PluginSettingTab {
         const { containerEl } = this;
         containerEl.empty();
 
+        // Add plugin version information
+        const versionInfo = containerEl.createEl('div', {
+            cls: 'dropbox-photo-grid-version',
+        });
+        
+        versionInfo.createEl('h2', {
+            text: 'Dropbox Photo Grid',
+        });
+        
+        // Get version from manifest
+        const manifest = this.plugin.manifest;
+        versionInfo.createEl('p', {
+            text: `Version: ${manifest.version}`,
+            attr: { style: 'margin-top: 0; color: var(--text-muted);' }
+        });
+        
+        versionInfo.createEl('hr');
+
         new Setting(containerEl)
             .setName('Dropbox Client ID')
             .setDesc('Enter your Dropbox app client ID')
