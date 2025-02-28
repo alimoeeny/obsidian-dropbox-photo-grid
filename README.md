@@ -27,6 +27,23 @@ This plugin allows you to embed a grid of photos from your Dropbox account based
 3. Reload Obsidian
 4. Enable the plugin in the Community Plugins settings
 
+## Development
+
+### Building the plugin
+
+- Clone this repository
+- Install dependencies: `npm install`
+- Build the plugin: `npm run build`
+- The compiled plugin will be in the `dist` directory
+
+### Development workflow
+
+- Start development build with watching: `npm run dev`
+- For a new release:
+  - Update version: `npm version [patch|minor|major]`
+  - Build: `npm run build`
+  - The release files will be in the `dist` directory
+
 ## Setup
 
 1. Go to Settings > Dropbox Photo Grid
@@ -163,16 +180,6 @@ If you encounter any issues or have feature requests:
 - Initial release
 - Basic Dropbox integration
 - Photo grid display with date filtering
-
-## Development
-
-This plugin is developed using TypeScript and the Obsidian API. Contributions are welcome!
-
-To build the plugin from source:
-1. Clone the repository
-2. Run `npm install`
-3. Run `npm run dev` to start compilation in watch mode
-4. Copy the `main.js`, `manifest.json`, and `styles.css` files to your vault's plugins directory
 
 ## License
 

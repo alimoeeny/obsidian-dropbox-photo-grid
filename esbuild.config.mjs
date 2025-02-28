@@ -1,6 +1,8 @@
 import esbuild from "esbuild";
 import process from "process";
 import builtins from "builtin-modules";
+import { mkdir } from "fs/promises";
+import path from "path";
 
 const banner =
 `/*
@@ -10,12 +12,20 @@ if you want to view the source, please visit the github repository of this plugi
 `;
 
 const prod = (process.argv[2] === "production");
+const outdir = "dist";
+
+// Ensure the dist directory exists
+try {
+    await mkdir(outdir, { recursive: true });
+} catch (err) {
+    console.error(`Error creating ${outdir} directory:`, err);
+}
 
 const context = await esbuild.context({
     banner: {
         js: banner,
     },
-    entryPoints: ["main.ts"],
+    entryPoints: ["main.ts", "embed.js"],
     bundle: true,
     external: [
         "obsidian",
@@ -37,7 +47,7 @@ const context = await esbuild.context({
     logLevel: "info",
     sourcemap: prod ? false : "inline",
     treeShaking: true,
-    outfile: "main.js",
+    outdir: outdir,
 });
 
 if (prod) {
