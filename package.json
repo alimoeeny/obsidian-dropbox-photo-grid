@@ -1,6 +1,6 @@
 {
     "name": "obsidian-dropbox-photo-grid",
-    "version": "1.0.2",
+    "version": "1.0.3",
     "description": "Display photos from Dropbox in a grid layout for Obsidian",
     "main": "dist/main.js",
     "scripts": {
