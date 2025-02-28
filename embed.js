@@ -96,7 +96,17 @@ class DropboxThumbnailViewer {
     }
 
     async displayThumbnails(folderPath, date) {
-        this.container.innerHTML = '<div class="dbx-loading">Loading files...</div>';
+        // Clear the container
+        while (this.container.firstChild) {
+            this.container.removeChild(this.container.firstChild);
+        }
+        
+        // Show loading message
+        const loadingDiv = document.createElement('div');
+        loadingDiv.className = 'dbx-loading';
+        loadingDiv.textContent = 'Loading files...';
+        this.container.appendChild(loadingDiv);
+        
         const targetDate = new Date(date);
 
         try {
@@ -104,7 +114,16 @@ class DropboxThumbnailViewer {
             const files = await this.getFilesForDate(folderPath, targetDate);
             
             if (files.length === 0) {
-                this.container.innerHTML = '<div class="dbx-loading">No files found for the selected date.</div>';
+                // Clear the container
+                while (this.container.firstChild) {
+                    this.container.removeChild(this.container.firstChild);
+                }
+                
+                // Show no files message
+                const noFilesDiv = document.createElement('div');
+                noFilesDiv.className = 'dbx-loading';
+                noFilesDiv.textContent = 'No files found for the selected date.';
+                this.container.appendChild(noFilesDiv);
                 return;
             }
 
@@ -118,12 +137,25 @@ class DropboxThumbnailViewer {
                 grid.appendChild(card);
             }
 
-            this.container.innerHTML = '';
+            // Clear the container
+            while (this.container.firstChild) {
+                this.container.removeChild(this.container.firstChild);
+            }
             this.container.appendChild(grid);
 
         } catch (error) {
             console.error('Error:', error);
-            this.container.innerHTML = `<div class="dbx-loading">Error: ${error.message}</div>`;
+            
+            // Clear the container
+            while (this.container.firstChild) {
+                this.container.removeChild(this.container.firstChild);
+            }
+            
+            // Show error message
+            const errorDiv = document.createElement('div');
+            errorDiv.className = 'dbx-loading';
+            errorDiv.textContent = `Error: ${error.message}`;
+            this.container.appendChild(errorDiv);
         }
     }
 

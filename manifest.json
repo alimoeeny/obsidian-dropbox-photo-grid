@@ -1,7 +1,7 @@
 {
     "id": "dropbox-photo-grid",
     "name": "Dropbox Photo Grid",
-    "version": "1.0.1",
+    "version": "1.0.2",
     "minAppVersion": "0.15.0",
     "description": "Display and embed photos from your Dropbox account in a customizable grid layout",
     "author": "Ali Moeeny",

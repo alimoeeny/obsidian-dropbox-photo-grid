@@ -268,7 +268,8 @@ export default class DropboxPhotoGridPlugin extends Plugin {
 
         // Add spinner keyframes to document
         const style = document.createElement('style');
-        style.innerHTML = DropboxPhotoGridPlugin.getSpinnerKeyframes();
+        const textNode = document.createTextNode(DropboxPhotoGridPlugin.getSpinnerKeyframes());
+        style.appendChild(textNode);
         document.head.appendChild(style);
 
         this.registerMarkdownCodeBlockProcessor('dropbox-photos', async (source, el) => {
