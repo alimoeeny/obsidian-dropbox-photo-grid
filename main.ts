@@ -216,6 +216,65 @@ export default class DropboxPhotoGridPlugin extends Plugin {
         `;
     }
 
+    // Pure function to get overlay modal styles
+    private static getOverlayStyles(): string {
+        return `
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.8);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 1000;
+            cursor: pointer;
+            opacity: 0;
+            transition: opacity 0.3s ease;
+        `;
+    }
+
+    // Pure function to get enlarged image styles
+    private static getEnlargedImageStyles(): string {
+        return `
+            max-width: 90%;
+            max-height: 90%;
+            object-fit: contain;
+            border-radius: 4px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.5);
+        `;
+    }
+
+    // Pure function to create the overlay for enlarged image view
+    private static createImageOverlay(imageUrl: string): HTMLElement {
+        const overlay = document.createElement('div');
+        overlay.className = 'dropbox-photo-overlay';
+        overlay.setAttribute('style', DropboxPhotoGridPlugin.getOverlayStyles());
+        
+        const enlargedImg = document.createElement('img');
+        enlargedImg.src = imageUrl;
+        enlargedImg.setAttribute('style', DropboxPhotoGridPlugin.getEnlargedImageStyles());
+        
+        overlay.appendChild(enlargedImg);
+        
+        // Add click event to close
+        overlay.addEventListener('click', () => {
+            overlay.style.opacity = '0';
+            setTimeout(() => {
+                overlay.remove();
+            }, 300);
+        });
+        
+        // Fade in the overlay
+        document.body.appendChild(overlay);
+        setTimeout(() => {
+            overlay.style.opacity = '1';
+        }, 10);
+        
+        return overlay;
+    }
+
     // Async function to fetch all files from Dropbox with pagination
     private async getAllFiles(dbx: Dropbox, folderPath: string): Promise<files.FileMetadata[]> {
         let allFiles: files.FileMetadata[] = [];
@@ -350,11 +409,20 @@ export default class DropboxPhotoGridPlugin extends Plugin {
                             path: file.path_lower
                         });
 
-                        container.createEl('img', {
+                        const img = container.createEl('img', {
                             attr: {
                                 src: response.result.link,
                                 style: DropboxPhotoGridPlugin.getPhotoStyles()
                             }
+                        });
+                        
+                        // Add cursor pointer style to indicate it's clickable
+                        img.style.cursor = 'pointer';
+                        
+                        // Add click event to show enlarged image
+                        img.addEventListener('click', (e) => {
+                            e.preventDefault();
+                            DropboxPhotoGridPlugin.createImageOverlay(response.result.link);
                         });
                     }));
 
