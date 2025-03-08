@@ -5,7 +5,7 @@
     "main": "dist/main.js",
     "scripts": {
         "dev": "node esbuild.config.mjs",
-        "build": "npm run clean && tsc -noEmit -skipLibCheck && node esbuild.config.mjs production && npm run copy-assets",
+        "build": "npm run clean && tsc -noEmit -skipLibCheck && node esbuild.config.mjs production && node auto-version-bump.mjs && npm run copy-assets",
         "clean": "rm -rf dist",
         "copy-assets": "cp manifest.json dist/ && cp versions.json dist/ && cp -r styles.css dist/ 2>/dev/null || true",
         "cleanup": "rm -f main.js *.js.map",
