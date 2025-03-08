@@ -380,7 +380,7 @@ class DropboxPhotoGridSettingTab extends PluginSettingTab {
     });
 
     new Setting(containerEl)
-      .setName("Dropbox Client ID")
+      .setName("Dropbox client ID")
       .setDesc("Enter your Dropbox app client ID")
       .addText((text) =>
         text
@@ -429,7 +429,7 @@ class DropboxPhotoGridSettingTab extends PluginSettingTab {
 
     if (this.plugin.settings.refreshToken) {
       new Setting(containerEl)
-        .setName("Authentication Status")
+        .setName("Authentication status")
         .setDesc("You are authenticated with Dropbox")
         .addButton((button) =>
           button.setButtonText("Clear Authentication").onClick(async () => {
