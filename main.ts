@@ -1,4 +1,4 @@
-import { App, Plugin, PluginSettingTab, Setting, Notice } from 'obsidian';
+import { App, Plugin, PluginSettingTab, Setting, Notice, requestUrl, RequestUrlParam, RequestUrlResponse } from 'obsidian';
 import { Dropbox, files } from 'dropbox';
 import * as http from 'http';
 
@@ -24,6 +24,20 @@ export default class DropboxPhotoGridPlugin extends Plugin {
     settings: DropboxPhotoGridSettings;
     dbx: Dropbox | null = null;
 
+    // Pure function to create a fetch-compatible response from Obsidian's RequestUrlResponse
+    private static createFetchResponse(response: RequestUrlResponse): Response {
+        return {
+            ok: response.status >= 200 && response.status < 300,
+            status: response.status,
+            statusText: response.status.toString(),
+            headers: new Headers(response.headers),
+            // Convert methods to proper async functions that return promises
+            json: async () => Promise.resolve(response.json),
+            text: async () => Promise.resolve(response.text),
+            arrayBuffer: async () => Promise.resolve(response.arrayBuffer),
+        } as unknown as Response;
+    }
+
     private async getDropboxClient(): Promise<Dropbox> {
         if (!this.settings.clientId) {
             throw new Error('Dropbox client ID not set. Please set it in the plugin settings.');
@@ -32,7 +46,8 @@ export default class DropboxPhotoGridPlugin extends Plugin {
         // If we have a refresh token, use it to get a new access token
         if (this.settings.refreshToken) {
             try {
-                const response = await fetch('https://api.dropbox.com/oauth2/token', {
+                const response = await requestUrl({
+                    url: 'https://api.dropbox.com/oauth2/token',
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/x-www-form-urlencoded',
@@ -41,11 +56,11 @@ export default class DropboxPhotoGridPlugin extends Plugin {
                         grant_type: 'refresh_token',
                         refresh_token: this.settings.refreshToken,
                         client_id: this.settings.clientId,
-                    }),
+                    }).toString(),
                 });
 
-                if (response.ok) {
-                    const data = await response.json();
+                if (response.status === 200) {
+                    const data = response.json;
                     this.settings.accessToken = data.access_token;
                     await this.saveSettings();
                 }
@@ -58,9 +73,30 @@ export default class DropboxPhotoGridPlugin extends Plugin {
             throw new Error('No valid Dropbox access token available. Please authenticate through the plugin settings.');
         }
 
+        // Create a fetch-compatible function using Obsidian's requestUrl
+        const obsidianFetch = async (url: string, init?: RequestInit): Promise<Response> => {
+            try {
+                // Create options object for requestUrl from fetch parameters
+                const options: RequestUrlParam = {
+                    url,
+                    method: init?.method || 'GET',
+                    headers: init?.headers as Record<string, string>,
+                    body: init?.body as string,
+                };
+                
+                const response = await requestUrl(options);
+                
+                // Use the pure function to create a Response-like object
+                return DropboxPhotoGridPlugin.createFetchResponse(response);
+            } catch (error) {
+                console.error('Error in obsidianFetch:', error);
+                throw error;
+            }
+        };
+
         return new Dropbox({
             accessToken: this.settings.accessToken,
-            fetch: fetch.bind(window)
+            fetch: obsidianFetch
         });
     }
 
@@ -405,25 +441,36 @@ export default class DropboxPhotoGridPlugin extends Plugin {
                     await Promise.all(photoContainers.map(async ({ container, file }) => {
                         if (!file.path_lower) return;
 
-                        const response = await dbx.filesGetTemporaryLink({
-                            path: file.path_lower
+                        const response = await requestUrl({
+                            url: 'https://api.dropboxapi.com/2/files/get_temporary_link',
+                            method: 'POST',
+                            headers: {
+                                Authorization: `Bearer ${this.settings.accessToken}`,
+                                'Content-Type': 'application/json',
+                            },
+                            body: JSON.stringify({
+                                path: file.path_lower,
+                            }),
                         });
 
-                        const img = container.createEl('img', {
-                            attr: {
-                                src: response.result.link,
-                                style: DropboxPhotoGridPlugin.getPhotoStyles()
-                            }
-                        });
-                        
-                        // Add cursor pointer style to indicate it's clickable
-                        img.style.cursor = 'pointer';
-                        
-                        // Add click event to show enlarged image
-                        img.addEventListener('click', (e) => {
-                            e.preventDefault();
-                            DropboxPhotoGridPlugin.createImageOverlay(response.result.link);
-                        });
+                        if (response.status === 200) {
+                            const data = response.json;
+                            const img = container.createEl('img', {
+                                attr: {
+                                    src: data.link,
+                                    style: DropboxPhotoGridPlugin.getPhotoStyles()
+                                }
+                            });
+                            
+                            // Add cursor pointer style to indicate it's clickable
+                            img.style.cursor = 'pointer';
+                            
+                            // Add click event to show enlarged image
+                            img.addEventListener('click', (e) => {
+                                e.preventDefault();
+                                DropboxPhotoGridPlugin.createImageOverlay(data.link);
+                            });
+                        }
                     }));
 
                 } catch (error) {
@@ -567,7 +614,8 @@ class DropboxPhotoGridSettingTab extends PluginSettingTab {
                 if (code) {
                     try {
                         // Exchange the code for tokens
-                        const response = await fetch('https://api.dropboxapi.com/oauth2/token', {
+                        const response = await requestUrl({
+                            url: 'https://api.dropboxapi.com/oauth2/token',
                             method: 'POST',
                             headers: {
                                 'Content-Type': 'application/x-www-form-urlencoded',
@@ -578,11 +626,11 @@ class DropboxPhotoGridSettingTab extends PluginSettingTab {
                                 client_id: this.plugin.settings.clientId,
                                 code_verifier: this.plugin.settings.codeVerifier,
                                 redirect_uri: 'http://localhost:53134/callback',
-                            }),
+                            }).toString(),
                         });
 
-                        if (response.ok) {
-                            const data = await response.json();
+                        if (response.status === 200) {
+                            const data = response.json;
                             
                             // Store the tokens
                             this.plugin.settings.accessToken = data.access_token;
@@ -596,7 +644,7 @@ class DropboxPhotoGridSettingTab extends PluginSettingTab {
                             this.display();
                         } else {
                             new Notice('Failed to authenticate with Dropbox');
-                            console.error('Token exchange failed:', await response.text());
+                            console.error('Token exchange failed:', response.text);
                         }
                     } catch (error) {
                         new Notice('Error during authentication');
