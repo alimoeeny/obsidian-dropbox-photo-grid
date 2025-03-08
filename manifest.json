@@ -8,5 +8,7 @@
   "isDesktopOnly": false,
   "fundingUrl": {
     "Ko-fi": "https://ko-fi.com/alimoeeny"
-  }
+  },
+  "version": "1.0.0",
+  "stylesheets": ["styles.css"]
 }

@@ -165,112 +165,16 @@ export default class DropboxPhotoGridPlugin extends Plugin {
     return path.toLowerCase().match(/\.(jpg|jpeg|png|gif)$/) !== null;
   }
 
-  // Pure function to create grid styles
-  private static getGridStyles(): string {
-    return `
-            display: grid;
-            grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
-            gap: 20px;
-            padding: 20px 0;
-        `;
-  }
-
-  // Pure function to create photo container styles
-  private static getPhotoContainerStyles(): string {
-    return `
-            aspect-ratio: 1;
-            overflow: hidden;
-            border-radius: 8px;
-            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-            transition: transform 0.2s;
-        `;
-  }
-
-  // Pure function to create photo styles
-  private static getPhotoStyles(): string {
-    return `
-            width: 100%;
-            height: 100%;
-            object-fit: cover;
-        `;
-  }
-
-  // Pure function to get loading indicator styles
-  private static getLoadingStyles(): string {
-    return `
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            justify-content: center;
-            padding: 20px;
-            gap: 10px;
-        `;
-  }
-
-  // Pure function to get spinner styles
-  private static getSpinnerStyles(): string {
-    return `
-            border: 3px solid var(--background-modifier-border);
-            border-top: 3px solid var(--text-accent);
-            border-radius: 50%;
-            width: 24px;
-            height: 24px;
-            animation: spin 1s linear infinite;
-        `;
-  }
-
-  // Pure function to get keyframes for spinner
-  private static getSpinnerKeyframes(): string {
-    return `
-            @keyframes spin {
-                0% { transform: rotate(0deg); }
-                100% { transform: rotate(360deg); }
-            }
-        `;
-  }
-
-  // Pure function to get overlay modal styles
-  private static getOverlayStyles(): string {
-    return `
-            position: fixed;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            background-color: rgba(0, 0, 0, 0.8);
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            z-index: 1000;
-            cursor: pointer;
-            opacity: 0;
-            transition: opacity 0.3s ease;
-        `;
-  }
-
-  // Pure function to get enlarged image styles
-  private static getEnlargedImageStyles(): string {
-    return `
-            max-width: 90%;
-            max-height: 90%;
-            object-fit: contain;
-            border-radius: 4px;
-            box-shadow: 0 4px 12px rgba(0,0,0,0.5);
-        `;
-  }
-
   // Pure function to create the overlay for enlarged image view
   private static createImageOverlay(imageUrl: string): HTMLElement {
     const overlay = document.createElement("div");
     overlay.className = "dropbox-photo-overlay";
-    overlay.setAttribute("style", DropboxPhotoGridPlugin.getOverlayStyles());
-
+    
     const enlargedImg = document.createElement("img");
     enlargedImg.src = imageUrl;
-    enlargedImg.setAttribute("style", DropboxPhotoGridPlugin.getEnlargedImageStyles());
-
+    
     overlay.appendChild(enlargedImg);
-
+    
     // Add click event to close
     overlay.addEventListener("click", () => {
       overlay.style.opacity = "0";
@@ -278,13 +182,13 @@ export default class DropboxPhotoGridPlugin extends Plugin {
         overlay.remove();
       }, 300);
     });
-
+    
     // Fade in the overlay
     document.body.appendChild(overlay);
     setTimeout(() => {
       overlay.style.opacity = "1";
     }, 10);
-
+    
     return overlay;
   }
 
@@ -338,12 +242,6 @@ export default class DropboxPhotoGridPlugin extends Plugin {
     await this.loadSettings();
     this.addSettingTab(new DropboxPhotoGridSettingTab(this.app, this));
 
-    // Add spinner keyframes to document
-    const style = document.createElement("style");
-    const textNode = document.createTextNode(DropboxPhotoGridPlugin.getSpinnerKeyframes());
-    style.appendChild(textNode);
-    document.head.appendChild(style);
-
     this.registerMarkdownCodeBlockProcessor("dropbox-photos", async (source, el) => {
       try {
         const [folderPath, date] = source.trim().split("\n");
@@ -357,16 +255,16 @@ export default class DropboxPhotoGridPlugin extends Plugin {
         }
 
         const container = el.createEl("div", {
-          attr: { class: "dropbox-photo-grid" },
+          cls: "dropbox-photo-grid",
         });
 
         // Show loading indicator
         const loadingContainer = container.createEl("div", {
-          attr: { style: DropboxPhotoGridPlugin.getLoadingStyles() },
+          cls: "loading-container",
         });
 
         const spinner = loadingContainer.createEl("div", {
-          attr: { style: DropboxPhotoGridPlugin.getSpinnerStyles() },
+          cls: "spinner",
         });
 
         loadingContainer.createEl("div", {
@@ -394,14 +292,12 @@ export default class DropboxPhotoGridPlugin extends Plugin {
 
           const grid = container.createEl("div", {
             cls: "photo-grid",
-            attr: { style: DropboxPhotoGridPlugin.getGridStyles() },
           });
 
           // Create all photo containers first
           const photoContainers = matchingFiles.map((file) => {
             const container = grid.createEl("div", {
               cls: "photo-container",
-              attr: { style: DropboxPhotoGridPlugin.getPhotoContainerStyles() },
             });
             return { container, file };
           });
@@ -425,15 +321,8 @@ export default class DropboxPhotoGridPlugin extends Plugin {
 
               if (response.status === 200) {
                 const data = response.json;
-                const img = container.createEl("img", {
-                  attr: {
-                    src: data.link,
-                    style: DropboxPhotoGridPlugin.getPhotoStyles(),
-                  },
-                });
-
-                // Add cursor pointer style to indicate it's clickable
-                img.style.cursor = "pointer";
+                const img = container.createEl("img");
+                img.src = data.link;
 
                 // Add click event to show enlarged image
                 img.addEventListener("click", (e) => {
