@@ -175,13 +175,24 @@ export default class DropboxPhotoGridPlugin extends Plugin {
 
     overlay.appendChild(enlargedImg);
 
-    // Add click event to close
-    overlay.addEventListener("click", () => {
-      overlay.style.opacity = "0";
-      setTimeout(() => {
-        overlay.remove();
-      }, 300);
+    // Create metadata panel
+    const metadataPanel = document.createElement("div");
+    metadataPanel.className = "dropbox-photo-metadata-panel";
+    metadataPanel.style.display = "none";
+    overlay.appendChild(metadataPanel);
+
+    // Add click event to close (only when clicking outside the metadata panel)
+    overlay.addEventListener("click", (e) => {
+      if (e.target === overlay || e.target === enlargedImg) {
+        overlay.style.opacity = "0";
+        setTimeout(() => {
+          overlay.remove();
+        }, 300);
+      }
     });
+
+    // Track if metadata has been loaded
+    let metadataLoaded = false;
 
     // Add keyboard navigation
     const keyHandler = (e: KeyboardEvent) => {
@@ -195,6 +206,12 @@ export default class DropboxPhotoGridPlugin extends Plugin {
 
         // Update current index for future navigation
         currentIndex = nextIndex;
+
+        // Reset metadata state for new image
+        metadataLoaded = false;
+        if (metadataPanel.style.display === "block") {
+          metadataPanel.innerHTML = "<div class='metadata-loading'>Loading metadata...</div>";
+        }
       } else if (e.key === "ArrowLeft") {
         // Navigate to previous image
         const prevIndex = (currentIndex - 1 + allImageUrls.length) % allImageUrls.length;
@@ -205,12 +222,71 @@ export default class DropboxPhotoGridPlugin extends Plugin {
 
         // Update current index for future navigation
         currentIndex = prevIndex;
+
+        // Reset metadata state for new image
+        metadataLoaded = false;
+        if (metadataPanel.style.display === "block") {
+          metadataPanel.innerHTML = "<div class='metadata-loading'>Loading metadata...</div>";
+        }
       } else if (e.key === "Escape") {
         // Close overlay on Escape key
         overlay.style.opacity = "0";
         setTimeout(() => {
           overlay.remove();
         }, 300);
+      } else if (e.key === "i" || e.key === "I") {
+        // Toggle metadata panel
+        if (metadataPanel.style.display === "none") {
+          metadataPanel.style.display = "block";
+
+          // Only load metadata if not already loaded
+          if (!metadataLoaded) {
+            metadataPanel.innerHTML = "<div class='metadata-loading'>Loading metadata...</div>";
+
+            try {
+              // Get the current image URL
+              const currentUrl = enlargedImg.src;
+
+              // Extract basic information from the current image
+              const naturalWidth = enlargedImg.naturalWidth;
+              const naturalHeight = enlargedImg.naturalHeight;
+
+              // Format the metadata for display without making API calls
+              let metadataHtml = "<h3>Image Information</h3>";
+
+              // Basic image info
+              metadataHtml += "<div class='metadata-section'>";
+
+              // Extract filename from URL
+              const urlParts = currentUrl.split("/");
+              const filename = urlParts[urlParts.length - 1].split("?")[0];
+              metadataHtml += `<div class='metadata-item'><span class='metadata-label'>Filename:</span> ${filename}</div>`;
+
+              // Image dimensions
+              metadataHtml += `<div class='metadata-item'><span class='metadata-label'>Dimensions:</span> ${naturalWidth} x ${naturalHeight} pixels</div>`;
+
+              // Current date/time (as a fallback)
+              const now = new Date();
+              metadataHtml += `<div class='metadata-item'><span class='metadata-label'>Viewed on:</span> ${now.toLocaleDateString()} ${now.toLocaleTimeString()}</div>`;
+
+              metadataHtml += "</div>";
+
+              // Note about extended metadata
+              metadataHtml += "<div class='metadata-note'>";
+              metadataHtml += "Note: Extended metadata (EXIF data) cannot be retrieved from temporary Dropbox links. ";
+              metadataHtml += "To view full EXIF data, download the image and use an EXIF viewer application.";
+              metadataHtml += "</div>";
+
+              metadataPanel.innerHTML = metadataHtml;
+              metadataLoaded = true;
+            } catch (error) {
+              console.error("Error loading metadata:", error);
+              metadataPanel.innerHTML = "<div class='metadata-error'>Error loading metadata.</div>";
+            }
+          }
+        } else {
+          metadataPanel.style.display = "none";
+        }
       }
     };
 

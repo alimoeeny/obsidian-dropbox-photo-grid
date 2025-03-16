@@ -73,3 +73,74 @@
   border-radius: 4px;
   box-shadow: 0 4px 12px rgba(0,0,0,0.5);
 }
+
+/* Metadata panel styles */
+.dropbox-photo-metadata-panel {
+  position: absolute;
+  top: 0;
+  right: 0;
+  width: 300px;
+  height: 100%;
+  background-color: rgba(30, 30, 30, 0.9);
+  color: #fff;
+  padding: 20px;
+  overflow-y: auto;
+  box-shadow: -2px 0 10px rgba(0,0,0,0.5);
+  z-index: 1001;
+  transition: transform 0.3s ease;
+}
+
+/* Metadata section styles */
+.dropbox-photo-metadata-panel h3 {
+  margin-top: 0;
+  margin-bottom: 16px;
+  font-size: 18px;
+  border-bottom: 1px solid rgba(255,255,255,0.2);
+  padding-bottom: 8px;
+}
+
+.dropbox-photo-metadata-panel h4 {
+  margin-top: 16px;
+  margin-bottom: 8px;
+  font-size: 16px;
+}
+
+.metadata-section {
+  margin-bottom: 20px;
+}
+
+.metadata-item {
+  margin-bottom: 8px;
+  line-height: 1.4;
+}
+
+.metadata-label {
+  font-weight: bold;
+  margin-right: 6px;
+  color: var(--text-accent, #7f6df2);
+}
+
+/* Loading and error states */
+.metadata-loading {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 100px;
+  color: rgba(255,255,255,0.7);
+}
+
+.metadata-error {
+  color: #ff6b6b;
+  padding: 16px 0;
+}
+
+/* Metadata note */
+.metadata-note {
+  margin-top: 20px;
+  padding: 12px;
+  background-color: rgba(255,255,255,0.1);
+  border-radius: 4px;
+  font-size: 0.9em;
+  color: rgba(255,255,255,0.8);
+  line-height: 1.4;
+}
