@@ -169,12 +169,12 @@ export default class DropboxPhotoGridPlugin extends Plugin {
   private static createImageOverlay(imageUrl: string): HTMLElement {
     const overlay = document.createElement("div");
     overlay.className = "dropbox-photo-overlay";
-    
+
     const enlargedImg = document.createElement("img");
     enlargedImg.src = imageUrl;
-    
+
     overlay.appendChild(enlargedImg);
-    
+
     // Add click event to close
     overlay.addEventListener("click", () => {
       overlay.style.opacity = "0";
@@ -182,13 +182,13 @@ export default class DropboxPhotoGridPlugin extends Plugin {
         overlay.remove();
       }, 300);
     });
-    
+
     // Fade in the overlay
     document.body.appendChild(overlay);
     setTimeout(() => {
       overlay.style.opacity = "1";
     }, 10);
-    
+
     return overlay;
   }
 
@@ -368,16 +368,6 @@ class DropboxPhotoGridSettingTab extends PluginSettingTab {
   display(): void {
     const { containerEl } = this;
     containerEl.empty();
-
-    // Add plugin version information as a small text at the top
-    const manifest = this.plugin.manifest;
-    const versionInfo = containerEl.createEl("div", {
-      cls: "dropbox-photo-grid-version",
-      attr: { style: "margin-bottom: 1em; color: var(--text-muted); font-size: 0.9em;" }
-    });
-    versionInfo.createEl("span", {
-      text: `Version: ${manifest.version}`,
-    });
 
     new Setting(containerEl)
       .setName("Dropbox client ID")
