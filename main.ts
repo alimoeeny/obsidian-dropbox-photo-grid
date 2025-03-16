@@ -165,8 +165,8 @@ export default class DropboxPhotoGridPlugin extends Plugin {
     return path.toLowerCase().match(/\.(jpg|jpeg|png|gif)$/) !== null;
   }
 
-  // Pure function to create the overlay for enlarged image view
-  private static createImageOverlay(imageUrl: string): HTMLElement {
+  // Create the overlay for enlarged image view with navigation
+  private static createImageOverlay(imageUrl: string, currentIndex: number, allImageUrls: string[]): HTMLElement {
     const overlay = document.createElement("div");
     overlay.className = "dropbox-photo-overlay";
 
@@ -181,6 +181,45 @@ export default class DropboxPhotoGridPlugin extends Plugin {
       setTimeout(() => {
         overlay.remove();
       }, 300);
+    });
+
+    // Add keyboard navigation
+    const keyHandler = (e: KeyboardEvent) => {
+      if (e.key === "ArrowRight") {
+        // Navigate to next image
+        const nextIndex = (currentIndex + 1) % allImageUrls.length;
+        const nextUrl = allImageUrls[nextIndex];
+
+        // Replace current image
+        enlargedImg.src = nextUrl;
+
+        // Update current index for future navigation
+        currentIndex = nextIndex;
+      } else if (e.key === "ArrowLeft") {
+        // Navigate to previous image
+        const prevIndex = (currentIndex - 1 + allImageUrls.length) % allImageUrls.length;
+        const prevUrl = allImageUrls[prevIndex];
+
+        // Replace current image
+        enlargedImg.src = prevUrl;
+
+        // Update current index for future navigation
+        currentIndex = prevIndex;
+      } else if (e.key === "Escape") {
+        // Close overlay on Escape key
+        overlay.style.opacity = "0";
+        setTimeout(() => {
+          overlay.remove();
+        }, 300);
+      }
+    };
+
+    // Add keyboard event listener
+    document.addEventListener("keydown", keyHandler);
+
+    // Remove event listener when overlay is closed
+    overlay.addEventListener("remove", () => {
+      document.removeEventListener("keydown", keyHandler);
     });
 
     // Fade in the overlay
@@ -327,7 +366,22 @@ export default class DropboxPhotoGridPlugin extends Plugin {
                 // Add click event to show enlarged image
                 img.addEventListener("click", (e) => {
                   e.preventDefault();
-                  DropboxPhotoGridPlugin.createImageOverlay(data.link);
+
+                  // Collect all image URLs for navigation
+                  const allImageUrls: string[] = [];
+                  let currentIndex = 0;
+
+                  // Find all images in the grid and collect their URLs
+                  const allImages = grid.querySelectorAll("img");
+                  allImages.forEach((image, index) => {
+                    allImageUrls.push(image.src);
+                    // If this is the clicked image, store its index
+                    if (image === e.target) {
+                      currentIndex = index;
+                    }
+                  });
+
+                  DropboxPhotoGridPlugin.createImageOverlay(data.link, currentIndex, allImageUrls);
                 });
               }
             })
