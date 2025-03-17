@@ -1,6 +1,7 @@
 import { App, Plugin, PluginSettingTab, Setting, Notice, requestUrl, RequestUrlParam, RequestUrlResponse } from "obsidian";
 import { Dropbox, files } from "dropbox";
 import * as http from "http";
+import EXIF from "exif-js";
 
 // Get electron modules
 const electron = require("electron");
@@ -166,7 +167,7 @@ export default class DropboxPhotoGridPlugin extends Plugin {
   }
 
   // Create the overlay for enlarged image view with navigation
-  private static createImageOverlay(imageUrl: string, currentIndex: number, allImageUrls: string[]): HTMLElement {
+  private static createImageOverlay(imageUrl: string, filename: string, currentIndex: number, allImageUrls: string[]): HTMLElement {
     const overlay = document.createElement("div");
     overlay.className = "dropbox-photo-overlay";
 
@@ -257,9 +258,7 @@ export default class DropboxPhotoGridPlugin extends Plugin {
               // Basic image info
               metadataHtml += "<div class='metadata-section'>";
 
-              // Extract filename from URL
-              const urlParts = currentUrl.split("/");
-              const filename = urlParts[urlParts.length - 1].split("?")[0];
+              // Filename
               metadataHtml += `<div class='metadata-item'><span class='metadata-label'>Filename:</span> ${filename}</div>`;
 
               // Image dimensions
@@ -271,10 +270,38 @@ export default class DropboxPhotoGridPlugin extends Plugin {
 
               metadataHtml += "</div>";
 
+              // Location data
+              let locationHtml = "";
+              EXIF.getData(currentUrl, function () {
+                const latitude = EXIF.getTag(this, "GPSLatitude");
+                const longitude = EXIF.getTag(this, "GPSLongitude");
+                const latitudeRef = EXIF.getTag(this, "GPSLatitudeRef");
+                const longitudeRef = EXIF.getTag(this, "GPSLongitudeRef");
+
+                if (latitude && longitude) {
+                  let lat = latitude[0] + latitude[1] / 60 + latitude[2] / 3600;
+                  let lon = longitude[0] + longitude[1] / 60 + longitude[2] / 3600;
+
+                  if (latitudeRef === "S") {
+                    lat = -lat;
+                  }
+                  if (longitudeRef === "W") {
+                    lon = -lon;
+                  }
+
+                  locationHtml += "<div class='metadata-section'>";
+                  locationHtml += "<h4>Location Information</h4>";
+                  locationHtml += `<div class='metadata-item'><span class='metadata-label'>Latitude:</span> ${lat}</div>`;
+                  locationHtml += `<div class='metadata-item'><span class='metadata-label'>Longitude:</span> ${lon}</div>`;
+                  locationHtml += "</div>";
+                }
+              });
+
+              metadataHtml += locationHtml;
+
               // Note about extended metadata
               metadataHtml += "<div class='metadata-note'>";
-              metadataHtml += "Note: Extended metadata (EXIF data) cannot be retrieved from temporary Dropbox links. ";
-              metadataHtml += "To view full EXIF data, download the image and use an EXIF viewer application.";
+              metadataHtml += "Note: EXIF data is extracted locally. Location data may not be available for all images.";
               metadataHtml += "</div>";
 
               metadataPanel.innerHTML = metadataHtml;
@@ -457,7 +484,7 @@ export default class DropboxPhotoGridPlugin extends Plugin {
                     }
                   });
 
-                  DropboxPhotoGridPlugin.createImageOverlay(data.link, currentIndex, allImageUrls);
+                  DropboxPhotoGridPlugin.createImageOverlay(data.link, file.name, currentIndex, allImageUrls);
                 });
               }
             })
@@ -607,7 +634,7 @@ class DropboxPhotoGridSettingTab extends PluginSettingTab {
 
               // Store the tokens
               this.plugin.settings.accessToken = data.access_token;
-              this.plugin.settings.refreshToken = data.refresh_token;
+              this.plugin.settings.refreshToken = data.refreshToken;
               await this.plugin.saveSettings();
 
               // Show success message
