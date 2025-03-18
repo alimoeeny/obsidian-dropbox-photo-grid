@@ -144,3 +144,45 @@
   color: rgba(255,255,255,0.8);
   line-height: 1.4;
 }
+
+/* Map link styling */
+.metadata-map-link {
+  display: inline-block;
+  margin-top: 8px;
+  padding: 6px 12px;
+  background-color: var(--text-accent, #7f6df2);
+  color: white;
+  border-radius: 4px;
+  text-decoration: none;
+  font-weight: bold;
+  transition: background-color 0.2s;
+}
+
+.metadata-map-link:hover {
+  background-color: var(--text-accent-hover, #9785f3);
+  text-decoration: none;
+}
+
+/* EXIF load button */
+#load-exif-button {
+  display: block;
+  width: 100%;
+  margin-top: 10px;
+  padding: 8px 12px;
+  background-color: var(--interactive-accent, #5d72de);
+  color: white;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  font-weight: bold;
+  transition: background-color 0.2s;
+}
+
+#load-exif-button:hover {
+  background-color: var(--interactive-accent-hover, #4c60c0);
+}
+
+#load-exif-button:disabled {
+  background-color: var(--interactive-normal, #777);
+  cursor: not-allowed;
+}

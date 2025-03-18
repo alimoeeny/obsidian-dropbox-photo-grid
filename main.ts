@@ -299,12 +299,222 @@ export default class DropboxPhotoGridPlugin extends Plugin {
 
               metadataHtml += locationHtml;
 
-              // Note about extended metadata
+              // Note about extended metadata and download button
               metadataHtml += "<div class='metadata-note'>";
-              metadataHtml += "Note: EXIF data is extracted locally. Location data may not be available for all images.";
+              metadataHtml += "Note: Basic image information is shown. For full EXIF data (including location), download the image.";
+              metadataHtml += "<button id='load-exif-button'>Load Full EXIF Data</button>";
               metadataHtml += "</div>";
 
               metadataPanel.innerHTML = metadataHtml;
+
+              // Add event listener to the button
+              const loadExifButton = document.getElementById("load-exif-button") as HTMLButtonElement;
+              if (loadExifButton) {
+                loadExifButton.addEventListener("click", async () => {
+                  loadExifButton.disabled = true;
+                  loadExifButton.textContent = "Loading EXIF Data...";
+
+                  try {
+                    loadExifButton.textContent = "Downloading image...";
+                    
+                    // Create a simple approach - just use the current image directly
+                    console.log("Using current image from DOM for EXIF extraction");
+                    
+                    // Get the current displayed image
+                    const img = enlargedImg;
+                    
+                    // Update load button
+                    loadExifButton.textContent = "Extracting EXIF data...";
+                    
+                    // Delay to allow UI update
+                    setTimeout(() => {
+                      try {
+                        // Extract EXIF data
+                        EXIF.getData(img, function() {
+                          console.log("EXIF.getData completed");
+                          
+                          // Log all available EXIF tags for debugging
+                          const allTags = EXIF.getAllTags(this);
+                          console.log("All EXIF tags:", allTags);
+                          
+                          let exifHtml = "";
+                          
+                          if (Object.keys(allTags).length > 0) {
+                            // We found some EXIF data
+                            exifHtml = "<div class='metadata-section'><h4>EXIF Information</h4>";
+                            
+                            // Add some common EXIF tags
+                            const exifData = [
+                              { label: "Make", tag: "Make" },
+                              { label: "Model", tag: "Model" },
+                              { label: "Date Taken", tag: "DateTimeOriginal" },
+                              { label: "Exposure", tag: "ExposureTime" },
+                              { label: "F-Stop", tag: "FNumber" },
+                              { label: "ISO", tag: "ISOSpeedRatings" },
+                              { label: "Focal Length", tag: "FocalLength" }
+                            ];
+                            
+                            // Add each available EXIF data point
+                            let hasExifData = false;
+                            exifData.forEach(item => {
+                              const value = EXIF.getTag(this, item.tag);
+                              if (value) {
+                                hasExifData = true;
+                                exifHtml += `<div class='metadata-item'><span class='metadata-label'>${item.label}:</span> ${value}</div>`;
+                              }
+                            });
+                            
+                            if (!hasExifData) {
+                              // If none of our standard tags were found, add raw tags
+                              Object.entries(allTags).slice(0, 10).forEach(([tag, value]) => {
+                                exifHtml += `<div class='metadata-item'><span class='metadata-label'>${tag}:</span> ${value}</div>`;
+                              });
+                            }
+                            
+                            exifHtml += "</div>";
+                          }
+                          
+                          // Try to get GPS data
+                          let locationHtml = "";
+                          const latitude = EXIF.getTag(this, "GPSLatitude");
+                          const longitude = EXIF.getTag(this, "GPSLongitude");
+                          const latitudeRef = EXIF.getTag(this, "GPSLatitudeRef");
+                          const longitudeRef = EXIF.getTag(this, "GPSLongitudeRef");
+                          
+                          console.log("GPS data:", { latitude, longitude, latitudeRef, longitudeRef });
+                          
+                          // If we have GPS coordinates, add location section
+                          if (latitude && longitude) {
+                            let lat = latitude[0] + latitude[1] / 60 + latitude[2] / 3600;
+                            let lon = longitude[0] + longitude[1] / 60 + longitude[2] / 3600;
+
+                            if (latitudeRef === "S") {
+                              lat = -lat;
+                            }
+                            if (longitudeRef === "W") {
+                              lon = -lon;
+                            }
+
+                            locationHtml = "<div class='metadata-section'>";
+                            locationHtml += "<h4>Location Information</h4>";
+                            locationHtml += `<div class='metadata-item'><span class='metadata-label'>Latitude:</span> ${lat.toFixed(6)}</div>`;
+                            locationHtml += `<div class='metadata-item'><span class='metadata-label'>Longitude:</span> ${lon.toFixed(6)}</div>`;
+                            
+                            // Add Google Maps link
+                            const mapUrl = `https://www.google.com/maps?q=${lat},${lon}`;
+                            locationHtml += `<div class='metadata-item'><a href="${mapUrl}" target="_blank" class="metadata-map-link">View on Map</a></div>`;
+                            locationHtml += "</div>";
+                          }
+
+                          // Combine all HTML
+                          const combinedHtml = exifHtml + locationHtml;
+                          
+                          // Update metadata panel with the collected data
+                          if (combinedHtml) {
+                            // Get existing content except for the metadata-note section
+                            const htmlParts = metadataPanel.innerHTML.split('<div class="metadata-note">');
+                            const existingContent = htmlParts.length > 1 ? htmlParts[0] : metadataPanel.innerHTML;
+                            
+                            // Add the new data
+                            metadataPanel.innerHTML = existingContent + combinedHtml + 
+                              '<div class="metadata-note">EXIF data loaded successfully.</div>';
+                              
+                            // Remove the button as we're done
+                            loadExifButton.remove();
+                          } else {
+                            // If no EXIF data was found, fetch full quality image as a fallback
+                            fetchFullQualityImage();
+                          }
+                        });
+                      } catch (err) {
+                        console.error("Error in EXIF extraction:", err);
+                        // If extraction failed, try downloading full quality image
+                        fetchFullQualityImage();
+                      }
+                    }, 100);
+                    
+                    // Function to fetch the full quality image as a fallback
+                    const fetchFullQualityImage = async () => {
+                      try {
+                        loadExifButton.textContent = "Downloading full quality image...";
+                        
+                        // Get the full quality image
+                        const response = await fetch(currentUrl);
+                        const blob = await response.blob();
+                        
+                        // Create a new image from the blob
+                        const objectUrl = URL.createObjectURL(blob);
+                        const tempImg = document.createElement('img');
+                        
+                        tempImg.onload = function() {
+                          // Read EXIF data from the full quality image
+                          EXIF.getData(tempImg, function() {
+                            const allTags = EXIF.getAllTags(this);
+                            console.log("EXIF tags from full quality image:", allTags);
+                            
+                            // Display data similar to above
+                            let exifHtml = "";
+                            if (Object.keys(allTags).length > 0) {
+                              exifHtml = "<div class='metadata-section'><h4>EXIF Information</h4>";
+                              
+                              // Just show first few tags as example
+                              Object.entries(allTags).slice(0, 10).forEach(([tag, value]) => {
+                                exifHtml += `<div class='metadata-item'><span class='metadata-label'>${tag}:</span> ${value}</div>`;
+                              });
+                              
+                              exifHtml += "</div>";
+                              
+                              // Update the panel
+                              const htmlParts = metadataPanel.innerHTML.split('<div class="metadata-note">');
+                              const existingContent = htmlParts.length > 1 ? htmlParts[0] : metadataPanel.innerHTML;
+                              metadataPanel.innerHTML = existingContent + exifHtml + 
+                                '<div class="metadata-note">Basic EXIF data loaded successfully.</div>';
+                                
+                              // Remove the button
+                              loadExifButton.remove();
+                            } else {
+                              // No EXIF data found
+                              metadataPanel.innerHTML += '<div class="metadata-note">No EXIF data found in this image.</div>';
+                              loadExifButton.textContent = "No EXIF data available";
+                              loadExifButton.disabled = true;
+                            }
+                            
+                            // Clean up
+                            URL.revokeObjectURL(objectUrl);
+                          });
+                        };
+                        
+                        // Handle errors
+                        tempImg.onerror = function() {
+                          console.error("Error loading image from blob URL");
+                          metadataPanel.innerHTML += '<div class="metadata-error">Error loading full quality image.</div>';
+                          loadExifButton.textContent = "Failed to load EXIF";
+                          loadExifButton.disabled = true;
+                          URL.revokeObjectURL(objectUrl);
+                        };
+                        
+                        // Start loading
+                        tempImg.src = objectUrl;
+                      } catch (err) {
+                        console.error("Error fetching full quality image:", err);
+                        metadataPanel.innerHTML += '<div class="metadata-error">Error: ' + err.message + '</div>';
+                        loadExifButton.textContent = "Failed to load EXIF";
+                        loadExifButton.disabled = true;
+                      }
+                    };
+                  } catch (error) {
+                    console.error("Error loading EXIF data:", error);
+                    metadataPanel.innerHTML += "<div class='metadata-error'>Error loading EXIF data: " + error.message + "</div>";
+                  } finally {
+                    // Keep the button, but update its state
+                    if (loadExifButton) {
+                      loadExifButton.textContent = "Retry Loading EXIF Data";
+                      loadExifButton.disabled = false;
+                    }
+                  }
+                });
+              }
+
               metadataLoaded = true;
             } catch (error) {
               console.error("Error loading metadata:", error);
